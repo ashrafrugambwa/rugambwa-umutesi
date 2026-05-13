@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Team Chris & Ash Grass Runner</title>
+<style>
+    body{margin:0;overflow:hidden;font-family:Arial;background:#0a3d1f;}
+    .top-bar{display:flex;justify-content:space-around;padding:12px;background:#111;color:white;font-size:20px;font-weight:bold;}
+    .game-area{width:100%;height:380px;position:relative;overflow:hidden;background:#052e16;}
+    .sky{position:absolute;top:0;width:100%;height:60%;background:linear-gradient(#4ade80,#86efac);overflow:hidden;}
+    .cloud{position:absolute;font-size:45px;opacity:0.7;animation:moveCloud 12s linear infinite;}
+    @keyframes moveCloud{from{left:-150px;}to{left:110%;}}
+    .trees-area{position:absolute;top:55%;width:100%;height:25%;overflow:hidden;}
+    .tree{position:absolute;font-size:48px;right:-80px;animation:moveTree 3s linear forwards;}
+    @keyframes moveTree{from{right:-80px;}to{right:110%;}}
+    .grass{position:absolute;bottom:0;width:100%;height:22%;background:linear-gradient(#15803d,#052e16);}
+    
+    .player{position:absolute;bottom:35px;left:80px;font-size:65px;}
+    .obstacle{position:absolute;bottom:35px;font-size:48px;right:-60px;}
+    
+    .start-text,.game-over,.pause-text{position:absolute;top:35%;width:100%;text-align:center;font-size:36px;font-weight:bold;z-index:10;}
+    .start-text{color:#fef08c;text-shadow:3px 3px #052e16;}
+    .game-over{color:#f87171;display:none;}
+    .pause-text{color:#60a5fa;display:none;}
+    
+    .menu-buttons{text-align:center;padding:10px;background:#111;}
+    .btn{display:inline-block;margin:6px;padding:12px 20px;background:#4ade80;color:#052e16;font-weight:bold;border-radius:8px;cursor:pointer;font-size:17px;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div>🏆 High Score: <span id="highScore">0</span></div>
+    <div>⭐ Score: <span id="score">0</span></div>
+    <div>🎮 Level: <span id="level">1</span></div>
+</div>
+
+<div class="menu-buttons">
+    <span class="btn" onclick="toggleAutoJump()">AUTO JUMP: <span id="autoStatus">OFF</span></span>
+    <span class="btn" onclick="togglePause()">⏸️ PAUSE</span>
+    <span class="btn" onclick="showLevelSelect()">LEVEL SELECT</span>
+    <span class="btn" onclick="showEquipRewards()">EQUIP REWARDS</span>
+    <span class="btn" style="background:#ec4899" onclick="playDiamonds()">💎 DIAMONDS</span>
+    <label class="btn" style="background:#eab308">
+        🎵 Custom Music <input type="file" id="musicFile" accept="audio/*" style="display:none;">
+    </label>
+</div>
+
+<div class="game-area">
+    <div class="sky">
+        <div class="cloud" style="top:30px;">☁️</div>
+        <div class="cloud" style="top:70px; animation-delay:3s;">☁️</div>
+        <div class="cloud" style="top:45px; animation-delay:6s;">☁️</div>
+    </div>
+    <div class="trees-area" id="treesArea"></div>
+    <div class="grass"></div>
+   
+    <div class="start-text" id="startText">
+        🌿 TEAM CHRIS & ASH GRASS RUNNER 🌿<br>
+        PRESS SPACE OR TAP TO START
+    </div>
+    <div class="game-over" id="gameOverText">💥 GAME OVER</div>
+    <div class="pause-text" id="pauseText">⏸️ PAUSED</div>
+   
+    <div class="player" id="player">🕺</div>
+    <div class="obstacle" id="obstacle">🪨</div>
+</div>
+
+<audio id="bgMusic" loop></audio>
+
+<script>
+// Variables
+let score = 0, highScore = 0, level = 1, speed = 9;
+let isJumping = false, gameStarted = false, isPaused = false;
+let obstacleX = 900;
+let currentSkin = "🕺", autoJump = false, autoJumpInterval = null;
+
+const player = document.getElementById("player");
+const obstacle = document.getElementById("obstacle");
+const scoreText = document.getElementById("score");
+const highScoreText = document.getElementById("highScore");
+const levelText = document.getElementById("level");
+const startText = document.getElementById("startText");
+const gameOverText = document.getElementById("gameOverText");
+const pauseText = document.getElementById("pauseText");
+const treesArea = document.getElementById("treesArea");
+const bgMusic = document.getElementById("bgMusic");
+const autoStatus = document.getElementById("autoStatus");
+
+const obstacles = ["🪨","🔥","📦","🌵","🚧","🐍"];
+
+// Permanent High Score
+if(localStorage.getItem("teamChrisAshGrassRunnerHighScore")){
+    highScore = parseInt(localStorage.getItem("teamChrisAshGrassRunnerHighScore"));
+    highScoreText.innerText = highScore;
+}
+
+// Music
+function playDiamonds() {
+    bgMusic.src = "https://instrumentalfx.co/wp-content/upload/11/Rihanna-Diamonds-instrumentalfx.mp3";
+    bgMusic.play().catch(()=>{});
+}
+
+document.getElementById("musicFile").addEventListener("change", function(e){
+    let file = e.target.files[0];
+    if(file){
+        bgMusic.src = URL.createObjectURL(file);
+        bgMusic.play();
+    }
+});
+
+// Pause
+function togglePause() {
+    if (!gameStarted) return;
+    isPaused = !isPaused;
+    pauseText.style.display = isPaused ? "block" : "none";
+    if (isPaused) bgMusic.pause();
+    else if (bgMusic.src) bgMusic.play().catch(()=>{});
+}
+
+// Jump
+function jump(){
+    if(isJumping || !gameStarted || isPaused) return;
+    isJumping = true;
+    player.style.transition = "bottom 0.5s ease-out";
+    player.style.bottom = "210px";
+    
+    setTimeout(() => {
+        player.style.bottom = "35px";
+        setTimeout(() => { isJumping = false; }, 150);
+    }, 480);
+}
+
+// Controls
+document.addEventListener("keydown", function(e){
+    if(e.code === "Space"){
+        e.preventDefault();
+        if(!gameStarted){
+            gameStarted = true;
+            startText.style.display = "none";
+            if(bgMusic.src) bgMusic.play().catch(()=>{});
+            if(autoJump) startAutoJump();
+        }
+        jump();
+    }
+    if(e.code === "KeyP" || e.code === "Escape"){
+        togglePause();
+    }
+});
+
+// Mobile Touch Support
+document.querySelector(".game-area").addEventListener("touchstart", function(e){
+    e.preventDefault();
+    if(!gameStarted){
+        gameStarted = true;
+        startText.style.display = "none";
+    }
+    jump();
+});
+
+// Auto Jump
+function toggleAutoJump(){
+    autoJump = !autoJump;
+    autoStatus.textContent = autoJump ? "ON" : "OFF";
+    autoStatus.style.color = autoJump ? "lime" : "white";
+}
+
+function startAutoJump(){
+    if(autoJumpInterval) clearInterval(autoJumpInterval);
+    autoJumpInterval = setInterval(() => {
+        if(gameStarted && !isJumping && !isPaused) jump();
+    }, 380);
+}
+
+// Game Functions
+function randomObstacle(){
+    obstacle.innerHTML = obstacles[Math.floor(Math.random()*obstacles.length)];
+}
+
+function spawnTree(){
+    if(!gameStarted || isPaused) return;
+    let tree = document.createElement("div");
+    tree.classList.add("tree");
+    tree.innerHTML = "🌳";
+    tree.style.top = (Math.random() * 90 + 5) + "px";
+    treesArea.appendChild(tree);
+    setTimeout(()=>tree.remove(), 3400);
+}
+
+function updateLevel(){
+    let newLevel = Math.floor(score / 35) + 1;
+    if(newLevel > level){
+        level = newLevel;
+        levelText.innerText = level;
+        speed = 9 + (level * 1.7);
+    }
+}
+
+function gameLoop(){
+    if(!gameStarted || isPaused) return;
+    obstacleX -= speed;
+    obstacle.style.right = (window.innerWidth - obstacleX) + "px";
+
+    if(obstacleX < -70){
+        obstacleX = window.innerWidth + 80;
+        randomObstacle();
+        score++;
+        scoreText.innerText = score;
+        
+        if(score > highScore){
+            highScore = score;
+            highScoreText.innerText = highScore;
+            localStorage.setItem("teamChrisAshGrassRunnerHighScore", highScore);
+        }
+        updateLevel();
+    }
+
+    if(obstacleX < 165 && obstacleX > 75 && !isJumping){
+        gameOver();
+    }
+}
+
+function gameOver(){
+    gameStarted = false;
+    isPaused = false;
+    if(autoJumpInterval) clearInterval(autoJumpInterval);
+    bgMusic.pause();
+    gameOverText.style.display = "block";
+    setTimeout(() => {
+        gameOverText.style.display = "none";
+        resetGame();
+    }, 1600);
+}
+
+function resetGame(){
+    score = 0;
+    scoreText.innerText = "0";
+    obstacleX = window.innerWidth + 100;
+    randomObstacle();
+    startText.style.display = "block";
+    gameStarted = false;
+    isPaused = false;
+    pauseText.style.display = "none";
+    if(autoJumpInterval) clearInterval(autoJumpInterval);
+}
+
+function showLevelSelect(){
+    let lvl = prompt("Andika Level (1-20):", level);
+    if(lvl && !isNaN(lvl)) {
+        level = parseInt(lvl);
+        levelText.innerText = level;
+        speed = 9 + (level * 1.7);
+        resetGame();
+    }
+}
+
+function showEquipRewards(){
+    let choice = prompt("Hitamo Skin:\n1. 🕺\n2. 🏃\n3. 🦸\n4. 🤖\n5. 🐵", "1");
+    if(choice === "1") currentSkin = "🕺";
+    else if(choice === "2") currentSkin = "🏃";
+    else if(choice === "3") currentSkin = "🦸";
+    else if(choice === "4") currentSkin = "🤖";
+    else if(choice === "5") currentSkin = "🐵";
+    player.innerHTML = currentSkin;
+}
+
+// Init
+randomObstacle();
+setInterval(gameLoop, 28);
+setInterval(spawnTree, 620);
+</script>
+</body>
+</html>
